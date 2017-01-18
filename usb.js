@@ -16,32 +16,112 @@ Object.keys(events.EventEmitter.prototype).forEach(function (key) {
 });
 
 // convenience method for finding a device by vendor and product id
-exports.findByIds = function(vid, pid) {
-	var devices = usb.getDeviceList()
+exports.findByIds = function(vid, pid, callback) {
+	var devices = usb.getDeviceList();
+	var err = null;
+	var device;
 
-	for (var i = 0; i < devices.length; i++) {
-		var deviceDesc = devices[i].deviceDescriptor
-		if ((deviceDesc.idVendor == vid) && (deviceDesc.idProduct == pid)) {
-			return devices[i]
+	try {
+		for (var i = 0; i < devices.length; i++) {
+			var deviceDesc = devices[i].deviceDescriptor
+			if ((deviceDesc.idVendor == vid) && (deviceDesc.idProduct == pid)) {
+				device = devices[i];
+				break;
+			}
 		}
+	} catch (e) {
+		err = e;
+	}
+
+	if (typeof(callback) === "function") {
+		return process.nextTick(function() {
+			callback(err, device);
+		});
+	} else {
+		if (err) {
+			throw err;
+		}
+
+		return device;
+	}
+}
+
+exports.getDeviceList = function(callback) {
+	var err = null;
+	var devices;
+
+	try {
+		devices = usb._getDeviceList();
+	} catch (e) {
+		err = e;
+	}
+
+	if (typeof(callback) === "function") {
+		return process.nextTick(function() {
+			callback(err, devices);
+		});
+	} else {
+		if (err) {
+			throw err;
+		}
+
+		return devices;
 	}
 }
 
 usb.Device.prototype.timeout = 1000
 
-usb.Device.prototype.open = function(defaultConfig){
-	this.__open()
-	if (defaultConfig === false) return
-	this.interfaces = []
-	var len = this.configDescriptor.interfaces.length
-	for (var i=0; i<len; i++){
-		this.interfaces[i] = new Interface(this, i)
+usb.Device.prototype.open = function(defaultConfig, callback) {
+	var err = null;
+
+	if (typeof(defaultConfig) === "function") {
+		callback = defaultConfig;
+		defaultConfig = true;
+	}
+
+	try {
+		this.__open()
+		if (defaultConfig !== false) {
+			this.interfaces = []
+			var len = this.configDescriptor.interfaces.length
+			for (var i=0; i<len; i++){
+				this.interfaces[i] = new Interface(this, i)
+			}
+		}
+	} catch (e) {
+		err = e;
+	}
+
+	if (typeof(callback) === "function") {
+		return process.nextTick(function() { 
+			callback(err);
+		});
+	} else {
+		if (err) {
+			throw err;
+		}
 	}
 }
 
-usb.Device.prototype.close = function(){
-	this.__close()
-	this.interfaces = null
+usb.Device.prototype.close = function(callback) {
+	var err = null;
+
+	try {
+		this.__close()
+		this.interfaces = null;
+	} catch (e) {
+		err = e;
+	}
+
+	if (typeof(callback) === "function") {
+		return process.nextTick(function() {
+			callback(err);
+		});
+	} else {
+		if (err) {
+			throw err;
+		}
+	}
 }
 
 Object.defineProperty(usb.Device.prototype, "configDescriptor", {
@@ -164,8 +244,24 @@ Interface.prototype.__refresh = function(){
 	}
 }
 
-Interface.prototype.claim = function(){
-	this.device.__claimInterface(this.id)
+Interface.prototype.claim = function(callback) {
+	var err = null;
+
+	try {
+		this.device.__claimInterface(this.id);
+	} catch (e) {
+		err = e;
+	}
+
+	if (typeof(callback) === "function") {
+		return process.nextTick(function() {
+			callback(err);
+		});
+	} else {
+		if (err) {
+			throw err;
+		}
+	}
 }
 
 Interface.prototype.release = function(closeEndpoints, cb){
